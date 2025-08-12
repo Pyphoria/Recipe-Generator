@@ -1,53 +1,59 @@
-import os
-import requests
-import json
 from flask import Flask, request, jsonify
+import requests
+import os
 
 app = Flask(__name__)
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-if not OPENROUTER_API_KEY:
-    raise ValueError("Bitte die Umgebungsvariable OPENROUTER_API_KEY setzen!")
+# API-Key von Render Environment Variables (RENDER Dashboard -> Environment)
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 @app.route("/", methods=["POST"])
 def generate_recipe():
-    data = request.json
-    ingredients = data.get("ingredients", "")
-
-    # Anfrage an OpenRouter
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://deine-domain.de",  # Optional
-        "X-Title": "Meine Rezept-App"               # Optional
-    }
-    payload = {
-        "model": "openai/gpt-4o",
-        "messages": [
-            {"role": "user", "content": f"Schreibe ein Rezept mit diesen Zutaten: {ingredients}"}
-        ]
-    }
-
     try:
+        data = request.get_json()
+        if not data or "ingredients" not in data:
+            return jsonify({"error": "Missing 'ingredients' field"}), 400
+
+        user_input = data["ingredients"]
+
+        # OpenRouter API-Request
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            data=json.dumps(payload),
-            timeout=15
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://your-site.com",  # optional, kann deine Render-URL sein
+                "X-Title": "Recipe Generator"
+            },
+            json={
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "Du bist ein hilfreicher Kochassistent."},
+                    {"role": "user", "content": f"Erstelle ein Rezept mit: {user_input}"}
+                ]
+            },
+            timeout=20
         )
 
-        # Falls kein Erfolg -> direkt Fehlertext zurückgeben
-        if not response.ok:
+        # Falls API nicht 200 zurückgibt, Fehler anzeigen
+        if response.status_code != 200:
             return jsonify({
-                "error": f"API-Fehler {response.status_code}",
+                "error": "OpenRouter API request failed",
+                "status_code": response.status_code,
                 "details": response.text
             }), 500
 
-        result = response.json()
-        return jsonify(result)
+        # Antwort verarbeiten
+        result_json = response.json()
+        recipe_text = result_json["choices"][0]["message"]["content"]
+
+        return jsonify({"recipe": recipe_text})
 
     except requests.exceptions.RequestException as e:
-        return jsonify({"error": "Request fehlgeschlagen", "details": str(e)}), 500
+        return jsonify({"error": "Request to OpenRouter failed", "details": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": "Server error", "details": str(e)}), 500
+
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
