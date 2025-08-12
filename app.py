@@ -31,7 +31,7 @@ def generate_recipe():
     }
 
     response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
+        "https://openrouter.ai/api/v1",
         headers=headers,
         json=payload
     )
