@@ -1,48 +1,53 @@
-from flask import Flask, request, jsonify
 import os
 import requests
+import json
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# API-Key aus Render-Environment
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+if not OPENROUTER_API_KEY:
+    raise ValueError("Bitte die Umgebungsvariable OPENROUTER_API_KEY setzen!")
 
 @app.route("/", methods=["POST"])
 def generate_recipe():
-    data = request.get_json()
-
-    # Zutaten aus Shortcut lesen
+    data = request.json
     ingredients = data.get("ingredients", "")
 
-    if not ingredients:
-        return jsonify({"error": "No ingredients provided"}), 400
-
-    # Anfrage an OpenRouter senden
+    # Anfrage an OpenRouter
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://deine-domain.de",  # Optional
+        "X-Title": "Meine Rezept-App"               # Optional
     }
     payload = {
-        "model": "openai/gpt-3.5-turbo",
+        "model": "openai/gpt-4o",
         "messages": [
-            {"role": "system", "content": "Du bist ein KI-Koch, der Rezepte aus Zutaten erstellt."},
-            {"role": "user", "content": f"Erstelle ein Rezept mit folgenden Zutaten: {ingredients}"}
+            {"role": "user", "content": f"Schreibe ein Rezept mit diesen Zutaten: {ingredients}"}
         ]
     }
 
-    response = requests.post(
-        "https://openrouter.ai/api/v1",
-        headers=headers,
-        json=payload
-    )
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            data=json.dumps(payload),
+            timeout=15
+        )
 
-    if response.status_code != 200:
-        return jsonify({"error": "OpenRouter API request failed"}), 500
+        # Falls kein Erfolg -> direkt Fehlertext zurückgeben
+        if not response.ok:
+            return jsonify({
+                "error": f"API-Fehler {response.status_code}",
+                "details": response.text
+            }), 500
 
-    result = response.json()
-    reply = result["choices"][0]["message"]["content"]
+        result = response.json()
+        return jsonify(result)
 
-    return jsonify({"recipe": reply})
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": "Request fehlgeschlagen", "details": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(debug=True)
