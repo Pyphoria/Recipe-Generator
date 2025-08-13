@@ -8,5 +8,5 @@ def home():
     return "I'm awake!"
 
 def keep_alive():
-    t = Thread(target=lambda: app.run(host='0.0.0.0', port=8080))
-    t.start()
+    t = Thread(target=lambda: app.run(host='0.0.0.0', port=8052))
+    t.start() 
