@@ -11,7 +11,7 @@ app = Flask(__name__)
 # --- Config (aus Render Environment) ---
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")  # Pflicht: setze in Render
 ACCESS_KEY = os.getenv("ACCESS_KEY")                  # optional: Header x-api-key Kontrolle
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-3.5-turbo")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # --- Healthcheck (für UptimeRobot) ---
